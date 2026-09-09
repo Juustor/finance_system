@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-calendar3"></i> 年度报告</h4>
+    <form method="get" class="d-flex align-items-center gap-2">
+        <select name="year" class="form-select form-select-sm" style="width: auto;">
+            {% for y in range(now.year, now.year-5, -1) %}
+            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i></button>
+    </form>
+</div>
+
+<!-- 年度总览 -->
+<div class="row g-2 g-md-3 mb-3">
+    <div class="col-4">
+        <div class="card p-3 text-center stat-card gradient-income">
+            <small class="text-success fw-bold">总收入</small>
+            <h5 class="mt-1 mb-0 text-success fw-bold stat-summary">{{ cs }}{{ "%.2f"|format(total_income) }}</h5>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card p-3 text-center stat-card gradient-expense">
+            <small class="text-danger fw-bold">总支出</small>
+            <h5 class="mt-1 mb-0 text-danger fw-bold stat-summary">{{ cs }}{{ "%.2f"|format(total_expense) }}</h5>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card p-3 text-center stat-card gradient-info">
+            <small class="text-primary fw-bold">结余</small>
+            <h5 class="mt-1 mb-0 {% if balance < 0 %}text-danger{% else %}text-primary{% endif %} fw-bold stat-summary">
+                {{ cs }}{{ "%.2f"|format(balance) }}
+            </h5>
+        </div>
+    </div>
+</div>
+
+<!-- 月度趋势 -->
+<div class="card p-4 mb-3">
+    <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> {{ year }}年 月度收支</h5>
+    <canvas id="yearChart" height="100"></canvas>
+</div>
+
+<!-- 支出分类排行 -->
+<div class="card p-4">
+    <h5 class="fw-bold mb-3"><i class="bi bi-trophy"></i> 支出分类排行 TOP10</h5>
+    {% if top_categories %}
+    <div class="table-responsive">
+        <table class="table table-borderless align-middle mb-0">
+            <thead><tr><th>排名</th><th>分类</th><th>金额</th><th>占比</th></tr></thead>
+            <tbody>
+                {% for cat in top_categories %}
+                <tr>
+                    <td class="fw-bold text-muted">{{ loop.index }}</td>
+                    <td class="fw-bold">{{ cat.name }}</td>
+                    <td class="fw-bold text-danger">{{ cs }}{{ "%.2f"|format(cat.total) }}</td>
+                    <td>
+                        {% if total_expense > 0 %}
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="progress flex-grow-1" style="height: 8px;">
+                                <div class="progress-bar bg-danger" style="width: {{ (cat.total/total_expense*100)|round(1) }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ "%.1f"|format(cat.total/total_expense*100) }}%</small>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-muted text-center py-3">暂无数据</div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('yearChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: [{% for m in months %}'{{ m.month }}月',{% endfor %}],
+        datasets: [
+            { label: '收入', data: [{% for m in months %}{{ m.income }},{% endfor %}], backgroundColor: '#10b981', borderRadius: 4 },
+            { label: '支出', data: [{% for m in months %}{{ m.expense }},{% endfor %}], backgroundColor: '#ef4444', borderRadius: 4 }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { position: 'top' } }
+    }
+});
+</script>
+{% endblock %}

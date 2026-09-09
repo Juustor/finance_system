@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-bell"></i> 提醒中心</h4>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addReminderModal">
+        <i class="bi bi-plus-lg"></i> 新建提醒
+    </button>
+</div>
+
+{% if reminders %}
+<div class="row g-3">
+    {% set grouped = {'pending': [], 'done': []} %}
+    {% for r in reminders %}
+        {% if r.paid %}{% set _ = grouped['done'].append(r) %}{% else %}{% set _ = grouped['pending'].append(r) %}{% endif %}
+    {% endfor %}
+
+    {% if grouped['pending'] %}
+    <div class="col-12">
+        <h6 class="fw-bold text-warning mb-2"><i class="bi bi-exclamation-circle"></i> 待处理（{{ grouped['pending']|length }}）</h6>
+        {% for r in grouped['pending'] %}
+        <div class="card p-3 mb-2 border-start border-warning border-4">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h6 class="fw-bold mb-1">{{ r.title }}</h6>
+                    <div class="small text-muted">
+                        {% if r.amount %}<span class="fw-bold text-danger">{{ cs }}{{ "%.2f"|format(r.amount) }}</span> · {% endif %}
+                        {% if r.due_date %}<span class="{% if r.due_date < now.strftime('%Y-%m-%d') %}text-danger{% endif %}">{{ r.due_date }}</span> · {% endif %}
+                        {% if r.repeat_type != 'none' %}{{ {'daily':'每天','weekly':'每周','monthly':'每月','yearly':'每年'}[r.repeat_type] }}重复 · {% endif %}
+                        {% if r.category_name %}{{ r.category_name }}{% endif %}
+                        {% if r.account_name %}({{ r.account_icon }}{{ r.account_name }}){% endif %}
+                    </div>
+                    {% if r.note %}<small class="text-muted">{{ r.note }}</small>{% endif %}
+                </div>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-primary rounded-pill" title="编辑"
+                            onclick="editReminder({{ r.id }}, '{{ r.title|e }}', '{{ r.amount }}', '{{ r.due_date or '' }}', '{{ r.repeat_type }}', '{{ r.category_id or '' }}', '{{ r.account_id or '' }}', '{{ r.note|e }}')">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <a href="/reminder/paid/{{ r.id }}" class="btn btn-sm btn-outline-success rounded-pill" title="标记已处理"><i class="bi bi-check-lg"></i></a>
+                    <a href="/reminder/delete/{{ r.id }}" class="btn btn-sm btn-outline-danger rounded-pill" onclick="return confirm('删除此提醒？')"><i class="bi bi-trash"></i></a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if grouped['done'] %}
+    <div class="col-12">
+        <h6 class="fw-bold text-muted mb-2"><i class="bi bi-check-circle"></i> 已处理（{{ grouped['done']|length }}）</h6>
+        {% for r in grouped['done'] %}
+        <div class="card p-3 mb-2 opacity-50">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h6 class="fw-bold mb-1"><s>{{ r.title }}</s></h6>
+                    <small class="text-muted">已处理</small>
+                </div>
+                <a href="/reminder/delete/{{ r.id }}" class="btn btn-sm btn-outline-danger rounded-pill" onclick="return confirm('删除此提醒？')"><i class="bi bi-trash"></i></a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+    <i class="bi bi-bell-slash" style="font-size: 4rem;"></i>
+    <p class="mt-3">暂无提醒</p>
+    <p class="small">添加还款、缴费等提醒事项</p>
+</div>
+{% endif %}
+
+<!-- 新建提醒 -->
+<div class="modal fade" id="addReminderModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="/reminders">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新建提醒</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">标题</label>
+                        <input type="text" name="title" class="form-control" placeholder="例：信用卡还款" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">金额（可选）</label>
+                        <div class="input-group">
+                            <span class="input-group-text">{{ cs }}</span>
+                            <input type="number" step="0.01" name="amount" class="form-control" value="0">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">截止日期</label>
+                            <input type="date" name="due_date" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">重复</label>
+                            <select name="repeat_type" class="form-select">
+                                <option value="none">不重复</option>
+                                <option value="daily">每天</option>
+                                <option value="weekly">每周</option>
+                                <option value="monthly">每月</option>
+                                <option value="yearly">每年</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">关联分类</label>
+                            <select name="category_id" class="form-select">
+                                <option value="">不限</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">关联账户</label>
+                            <select name="account_id" class="form-select">
+                                <option value="">不限</option>
+                                {% for ac in accounts %}
+                                <option value="{{ ac.id }}">{{ ac.icon }} {{ ac.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">备注</label>
+                        <textarea name="note" class="form-control" rows="2" placeholder="可选备注"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑提醒 -->
+<div class="modal fade" id="editReminderModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="editReminderForm">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> 编辑提醒</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">标题</label>
+                        <input type="text" name="title" id="editReminderTitle" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">金额（可选）</label>
+                        <div class="input-group">
+                            <span class="input-group-text">{{ cs }}</span>
+                            <input type="number" step="0.01" name="amount" id="editReminderAmount" class="form-control" value="0">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">截止日期</label>
+                            <input type="date" name="due_date" id="editReminderDue" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">重复</label>
+                            <select name="repeat_type" id="editReminderRepeat" class="form-select">
+                                <option value="none">不重复</option>
+                                <option value="daily">每天</option>
+                                <option value="weekly">每周</option>
+                                <option value="monthly">每月</option>
+                                <option value="yearly">每年</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">关联分类</label>
+                            <select name="category_id" id="editReminderCategory" class="form-select">
+                                <option value="">不限</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">关联账户</label>
+                            <select name="account_id" id="editReminderAccount" class="form-select">
+                                <option value="">不限</option>
+                                {% for ac in accounts %}
+                                <option value="{{ ac.id }}">{{ ac.icon }} {{ ac.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">备注</label>
+                        <textarea name="note" id="editReminderNote" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function editReminder(id, title, amount, dueDate, repeatType, categoryId, accountId, note) {
+    document.getElementById('editReminderForm').action = '/reminder/edit/' + id;
+    document.getElementById('editReminderTitle').value = title;
+    document.getElementById('editReminderAmount').value = amount;
+    document.getElementById('editReminderDue').value = dueDate;
+    document.getElementById('editReminderRepeat').value = repeatType;
+    document.getElementById('editReminderCategory').value = categoryId || '';
+    document.getElementById('editReminderAccount').value = accountId || '';
+    document.getElementById('editReminderNote').value = note;
+    new bootstrap.Modal(document.getElementById('editReminderModal')).show();
+}
+</script>
+{% endblock %}

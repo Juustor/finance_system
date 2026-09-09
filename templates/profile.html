@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="fw-bold mb-3">🔧 个人中心</h2>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h5 class="fw-bold mb-3">修改密码</h5>
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label">原密码</label>
+                    <input type="password" name="old_password" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">新密码</label>
+                    <input type="password" name="new_password" class="form-control" required minlength="6">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">确认新密码</label>
+                    <input type="password" name="confirm_password" class="form-control" required minlength="6">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">✅ 更新密码</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

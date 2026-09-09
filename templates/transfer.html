@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-arrow-left-right"></i> 转账</h4>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-5">
+        <div class="card p-4">
+            <h5 class="fw-bold mb-3"><i class="bi bi-send"></i> 发起转账</h5>
+            <form method="post" action="/transfer">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">转出账户</label>
+                    <select name="from_account" class="form-select" required>
+                        <option value="">选择账户</option>
+                        {% for ac in accounts %}
+                        <option value="{{ ac.id }}">{{ ac.icon }} {{ ac.name }} ({{ cs }}{{ "%.2f"|format(ac.balance) }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">转入账户</label>
+                    <select name="to_account" class="form-select" required>
+                        <option value="">选择账户</option>
+                        {% for ac in accounts %}
+                        <option value="{{ ac.id }}">{{ ac.icon }} {{ ac.name }} ({{ cs }}{{ "%.2f"|format(ac.balance) }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">金额</label>
+                    <div class="input-group">
+                        <span class="input-group-text">{{ cs }}</span>
+                        <input type="number" step="0.01" name="amount" class="form-control" placeholder="0.00" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">日期</label>
+                    <input type="date" name="date" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">备注</label>
+                    <input type="text" name="description" class="form-control" placeholder="可选">
+                </div>
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 确认转账</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card p-4">
+            <h5 class="fw-bold mb-3"><i class="bi bi-clock-history"></i> 转账记录</h5>
+            {% if transfers %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead><tr><th>日期</th><th>转出</th><th></th><th>转入</th><th>金额</th><th>备注</th><th>操作</th></tr></thead>
+                    <tbody>
+                        {% for t in transfers %}
+                        <tr>
+                            <td class="small">{{ t.date }}</td>
+                            <td><span class="badge bg-danger bg-opacity-10 text-danger">{{ t.from_icon }} {{ t.from_name }}</span></td>
+                            <td><i class="bi bi-arrow-right text-muted"></i></td>
+                            <td><span class="badge bg-success bg-opacity-10 text-success">{{ t.to_icon }} {{ t.to_name }}</span></td>
+                            <td class="fw-bold">{{ cs }}{{ "%.2f"|format(t.amount) }}</td>
+                            <td><small class="text-muted">{{ t.description or '--' }}</small></td>
+                            <td>
+                                <a href="/transfer/delete/{{ t.id }}" class="btn btn-sm btn-outline-danger rounded-pill"
+                                   onclick="return confirm('删除此转账记录？')"><i class="bi bi-trash"></i></a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-arrow-left-right" style="font-size: 3rem;"></i>
+                <p class="mt-2">暂无转账记录</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.querySelector('[name="date"]').valueAsDate = new Date();
+</script>
+{% endblock %}

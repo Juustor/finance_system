@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<h4 class="fw-bold mb-3"><i class="bi bi-graph-up"></i> 统计分析</h4>
+
+<!-- 当月分类支出 -->
+<div class="card p-4 mb-3">
+    <h5 class="fw-bold mb-3"><i class="bi bi-pie-chart"></i> 当月支出分类</h5>
+    <div class="row align-items-center">
+        <div class="col-md-5">
+            <canvas id="pieChart" height="200"></canvas>
+        </div>
+        <div class="col-md-7">
+            {% if labels %}
+            <div class="table-responsive">
+                <table class="table table-sm table-borderless mb-0">
+                    <thead><tr><th>分类</th><th>金额</th><th>占比</th></tr></thead>
+                    <tbody>
+                        {% set total = data|sum %}
+                        {% for i in range(labels|length) %}
+                        <tr>
+                            <td><span class="d-inline-block rounded-circle me-1" style="width: 10px; height: 10px; background: {{ colors[i] }};"></span> {{ labels[i] }}</td>
+                            <td class="fw-bold">{{ cs }}{{ "%.2f"|format(data[i]) }}</td>
+                            <td>{{ "%.1f"|format(data[i]/total*100) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-muted text-center py-3">暂无支出数据</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 近6个月趋势 -->
+<div class="card p-4 mb-3">
+    <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> 近6个月收支趋势</h5>
+    <canvas id="barChart" height="80"></canvas>
+</div>
+
+<!-- 净资产趋势 -->
+<div class="card p-4 mb-3">
+    <h5 class="fw-bold mb-3"><i class="bi bi-currency-exchange"></i> 近6个月净资产变化</h5>
+    <canvas id="netWorthChart" height="80"></canvas>
+</div>
+
+<!-- 日历热力 -->
+<div class="card p-4">
+    <h5 class="fw-bold mb-3"><i class="bi bi-calendar3"></i> {{ month_name }} 日历</h5>
+    <table class="table table-bordered text-center mb-0">
+        <thead><tr><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th></tr></thead>
+        <tbody>
+            {% for week in cal %}
+            <tr>
+                {% for day in week %}
+                <td style="height: 60px; vertical-align: middle; position: relative; font-size: 0.9rem; cursor: pointer;"
+                    {% if day != 0 %}onclick="location.href='/records?start_date={{ year }}-{{ "%02d"|format(month) }}-{{ "%02d"|format(day) }}&end_date={{ year }}-{{ "%02d"|format(month) }}-{{ "%02d"|format(day) }}'"{% endif %}>
+                    {% if day != 0 %}
+                    <div class="fw-bold">{{ day }}</div>
+                    {% set expense_info = daily_expenses.get(day, {'amount': 0, 'opacity': 0}) %}
+                    {% if expense_info.amount > 0 %}
+                        <small class="text-danger fw-bold">{{ cs }}{{ "%.0f"|format(expense_info.amount) }}</small>
+                        <div style="position: absolute; bottom: 0; left: 2px; right: 2px; height: 4px; background: #ef4444; opacity: {{ expense_info.opacity }}; border-radius: 2px;"></div>
+                    {% endif %}
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <small class="text-muted mt-2"><i class="bi bi-info-circle"></i> 红色深度表示当日支出金额，点击日期查看当日明细</small>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const pieCtx = document.getElementById('pieChart').getContext('2d');
+new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ labels | tojson }},
+        datasets: [{
+            data: {{ data | tojson }},
+            backgroundColor: {{ colors | tojson }}
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false }
+        }
+    }
+});
+
+const barCtx = document.getElementById('barChart').getContext('2d');
+new Chart(barCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ months | tojson }},
+        datasets: [
+            { label: '收入', data: {{ income_trend | tojson }}, backgroundColor: '#10b981', borderRadius: 4 },
+            { label: '支出', data: {{ expense_trend | tojson }}, backgroundColor: '#ef4444', borderRadius: 4 }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { position: 'top' } }
+    }
+});
+
+const nwCtx = document.getElementById('netWorthChart').getContext('2d');
+new Chart(nwCtx, {
+    type: 'line',
+    data: {
+        labels: {{ months | tojson }},
+        datasets: [{
+            label: '结余',
+            data: {{ net_worth_trend | tojson }},
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#6366f1'
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { display: false } }
+    }
+});
+</script>
+{% endblock %}

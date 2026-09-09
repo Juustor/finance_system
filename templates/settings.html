@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3"><i class="bi bi-sliders"></i> 用户设置</h4>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card p-4">
+            <form method="post">
+                <h5 class="fw-bold mb-3"><i class="bi bi-palette"></i> 界面偏好</h5>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">主题模式</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="dark_mode" value="0" id="lightMode"
+                                   {% if not settings.dark_mode %}checked{% endif %}>
+                            <label class="form-check-label" for="lightMode"><i class="bi bi-sun"></i> 浅色模式</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="dark_mode" value="1" id="darkMode"
+                                   {% if settings.dark_mode %}checked{% endif %}>
+                            <label class="form-check-label" for="darkMode"><i class="bi bi-moon-stars"></i> 深色模式</label>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-currency-exchange"></i> 货币与账户</h5>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">货币符号</label>
+                        <select name="currency_symbol" class="form-select">
+                            <option value="¥" {% if settings.currency_symbol == '¥' %}selected{% endif %}>¥ (人民币)</option>
+                            <option value="$" {% if settings.currency_symbol == '$' %}selected{% endif %}>$ (美元)</option>
+                            <option value="€" {% if settings.currency_symbol == '€' %}selected{% endif %}>€ (欧元)</option>
+                            <option value="£" {% if settings.currency_symbol == '£' %}selected{% endif %}>£ (英镑)</option>
+                            <option value="HK$" {% if settings.currency_symbol == 'HK$' %}selected{% endif %}>HK$ (港币)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">默认账户</label>
+                        <select name="default_account_id" class="form-select">
+                            <option value="">不设置</option>
+                            {% for ac in accounts %}
+                            <option value="{{ ac.id }}" {% if settings.default_account_id == ac.id %}selected{% endif %}>{{ ac.icon }} {{ ac.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-list"></i> 列表设置</h5>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">每页显示条数</label>
+                    <select name="page_size" class="form-select" style="max-width: 200px;">
+                        <option value="20" {% if settings.page_size == 20 %}selected{% endif %}>20</option>
+                        <option value="50" {% if settings.page_size == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if settings.page_size == 100 %}selected{% endif %}>100</option>
+                        <option value="999999" {% if settings.page_size == 999999 %}selected{% endif %}>全部</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2"><i class="bi bi-check-lg"></i> 保存设置</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

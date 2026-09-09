@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-pie-chart"></i> 月度预算</h4>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/budget?month={{ prev_month }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-left"></i></a>
+        <span class="fw-bold text-nowrap">{{ month }}</span>
+        <a href="/budget?month={{ next_month }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-right"></i></a>
+    </div>
+</div>
+
+<!-- 本月预算总览 -->
+<div class="card p-3 mb-3 gradient-info">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-primary fw-bold"><i class="bi bi-piggy-bank"></i> 预算使用情况</span>
+        <span class="fw-bold text-primary stat-summary">
+            {{ cs }}{{ "%.2f"|format(total_spent) }} / {{ cs }}{{ "%.2f"|format(total_budget) }}
+        </span>
+    </div>
+    <div class="progress" style="height: 10px;">
+        {% if total_budget > 0 %}
+        <div class="progress-bar {% if total_spent > total_budget %}bg-danger{% else %}bg-primary{% endif %}"
+             style="width: {{ (total_spent/total_budget*100) if total_spent <= total_budget else 100 }}%"></div>
+        {% endif %}
+    </div>
+    {% if total_budget > 0 %}
+    <small class="text-muted mt-1">总体完成 {{ "%.1f"|format(total_spent/total_budget*100) }}%</small>
+    {% endif %}
+</div>
+
+<div class="card p-4">
+    <table class="table table-borderless align-middle">
+        <thead>
+            <tr>
+                <th>支出分类</th>
+                <th>预算金额</th>
+                <th>当月已用</th>
+                <th>剩余额度</th>
+                <th style="width: 140px;">进度</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for cat in categories %}
+        {% set spent = spent_dict.get(cat.id, 0) %}
+        {% set budget_amt = budgets.get(cat.id, 0) %}
+        <tr>
+            <form method="post" action="/budget" class="row g-2 align-items-center" style="display: contents;">
+                <input type="hidden" name="month" value="{{ month }}">
+                <td class="fw-bold">{{ cat.name }}</td>
+                <td>
+                    <input type="hidden" name="category_id" value="{{ cat.id }}">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">{{ cs }}</span>
+                        <input type="number" step="0.01" name="amount" class="form-control"
+                               value="{{ budget_amt if budget_amt > 0 else '' }}" placeholder="0.00" style="max-width: 120px;">
+                    </div>
+                </td>
+                <td class="text-danger fw-bold stat-summary">{{ cs }}{{ "%.2f"|format(spent) }}</td>
+                <td>
+                    {% if budget_amt > 0 %}
+                        {% set remaining = budget_amt - spent %}
+                        <span class="fw-bold stat-summary {{ 'text-success' if remaining >= 0 else 'text-danger' }}">
+                            {{ cs }}{{ "%.2f"|format(remaining) }}
+                        </span>
+                    {% else %}
+                        <span class="text-muted">--</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if budget_amt > 0 %}
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar {% if spent > budget_amt %}bg-danger{% else %}bg-success{% endif %}"
+                             style="width: {{ (spent/budget_amt*100) if spent <= budget_amt else 100 }}%"></div>
+                    </div>
+                    {% else %}
+                    <span class="text-muted small">未设置</span>
+                    {% endif %}
+                </td>
+                <td><button type="submit" class="btn btn-primary btn-sm rounded-pill">💾 保存</button></td>
+            </form>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

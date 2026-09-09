@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-trash3"></i> 回收站</h4>
+    <div>
+        <span class="text-muted small me-2">30天后自动清除</span>
+        {% if records %}
+        <a href="/trash/empty" class="btn btn-outline-danger btn-sm" onclick="return confirm('确认永久清空回收站？')"><i class="bi bi-trash"></i> 清空回收站</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if records %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>日期</th>
+                <th>类型</th>
+                <th>分类</th>
+                <th>账户</th>
+                <th>金额</th>
+                <th>备注</th>
+                <th>删除时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr class="text-muted">
+                <td class="small">{{ r.date }}</td>
+                <td>
+                    <span class="badge bg-{{ 'success' if r.type=='income' else 'danger' }} bg-opacity-10 text-{{ 'success' if r.type=='income' else 'danger' }} px-2 py-1">
+                        {{ '💰 收入' if r.type=='income' else '💸 支出' }}
+                    </span>
+                </td>
+                <td class="small">{{ r.category_name }}</td>
+                <td><small>{{ r.account_name or '--' }}</small></td>
+                <td class="fw-bold {{ 'text-success' if r.type=='income' else 'text-danger' }}">
+                    {{ '+' if r.type=='income' else '-' }}{{ cs }}{{ "%.2f"|format(r.amount) }}
+                </td>
+                <td><small>{{ r.description or '--' }}</small></td>
+                <td><small class="text-muted">{{ r.deleted_at[:10] if r.deleted_at else '--' }}</small></td>
+                <td>
+                    <div class="d-flex gap-1">
+                        <a href="/record/restore/{{ r.id }}" class="btn btn-sm btn-outline-success" onclick="return confirm('恢复这条记录？')"><i class="bi bi-arrow-counterclockwise"></i> 恢复</a>
+                        <a href="/record/permanent-delete/{{ r.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('永久删除？不可恢复！')"><i class="bi bi-x-lg"></i></a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-trash3" style="font-size: 4rem; color: #cbd5e1;"></i>
+    <h5 class="text-muted mt-3">回收站是空的</h5>
+    <p class="text-muted">删除的记录会在这里保留30天</p>
+</div>
+{% endif %}
+{% endblock %}

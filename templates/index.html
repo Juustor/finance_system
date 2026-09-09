@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<!-- 指标总览 -->
+<div class="row g-2 g-md-3 mb-3">
+    <div class="col-6 col-xl-3">
+        <div class="card p-3 h-100 stat-card gradient-income">
+            <small class="text-success fw-bold"><i class="bi bi-arrow-down-circle"></i> 本月收入</small>
+            <div class="fs-5 fw-bold text-success mt-1 stat-summary">{{ cs }}{{ "%.2f"|format(income_total) }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card p-3 h-100 stat-card gradient-expense">
+            <small class="text-danger fw-bold"><i class="bi bi-arrow-up-circle"></i> 本月支出</small>
+            <div class="fs-5 fw-bold text-danger mt-1 stat-summary">{{ cs }}{{ "%.2f"|format(expense_total) }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card p-3 h-100 stat-card gradient-info">
+            <small class="text-primary fw-bold"><i class="bi bi-calculator"></i> 本月结余</small>
+            <div class="fs-5 fw-bold mt-1 stat-summary {% if income_total - expense_total < 0 %}text-danger{% else %}text-primary{% endif %}">
+                {{ cs }}{{ "%.2f"|format(income_total - expense_total) }}
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card p-3 h-100 stat-card gradient-primary">
+            <small class="fw-bold" style="color: var(--primary);"><i class="bi bi-piggy-bank"></i> 净资产</small>
+            <div class="fs-5 fw-bold mt-1 stat-summary" style="color: var(--primary);">{{ cs }}{{ "%.2f"|format(summary.net_worth) }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- 账户余额概览 -->
+{% if accounts %}
+<div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-wallet2"></i> 我的账户</h6>
+        <a href="/accounts" class="small text-decoration-none">管理 <i class="bi bi-chevron-right"></i></a>
+    </div>
+    <div class="row g-2">
+        {% for ac in accounts %}
+        <div class="col-6 col-md-4 col-xl-3">
+            <div class="d-flex align-items-center p-2 rounded gradient-primary" style="min-width: 0;">
+                <span style="font-size: 1.5rem;">{{ ac.icon }}</span>
+                <div class="ms-2" style="min-width: 0;">
+                    <div class="small fw-bold text-truncate">{{ ac.name }}</div>
+                    <small class="text-muted stat-summary">{{ cs }}{{ "%.2f"|format(ac.balance) }}</small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- 待办提醒 -->
+{% if pending_reminders %}
+<div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-bell-fill text-warning"></i> 待办提醒</h6>
+        <a href="/reminders" class="small text-decoration-none">全部 <i class="bi bi-chevron-right"></i></a>
+    </div>
+    {% for r in pending_reminders %}
+    <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">
+        <div>
+            <span class="fw-bold small">{{ r.title }}</span>
+            {% if r.amount %}<span class="text-danger fw-bold ms-2 stat-summary">{{ cs }}{{ "%.2f"|format(r.amount) }}</span>{% endif %}
+            {% if r.due_date %}<br><small class="text-muted">截止: {{ r.due_date }}</small>{% endif %}
+        </div>
+        <a href="/reminder/paid/{{ r.id }}" class="btn btn-sm btn-outline-success rounded-pill"><i class="bi bi-check-lg"></i></a>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- 预算执行 -->
+<div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-pie-chart"></i> 预算执行</h6>
+        <a href="/budget" class="small text-decoration-none">管理 <i class="bi bi-chevron-right"></i></a>
+    </div>
+    {% if budget_details %}
+        {% for b in budget_details %}
+        <div class="mb-2">
+            <div class="d-flex justify-content-between align-items-center small">
+                <span class="fw-bold">{{ b.category_name }}</span>
+                <span class="{% if b.over %}text-danger{% else %}text-success{% endif %} fw-bold stat-summary">
+                    {{ cs }}{{ "%.2f"|format(b.spent) }} / {{ cs }}{{ "%.2f"|format(b.amount) }}
+                </span>
+            </div>
+            <div class="progress" style="height: 6px;">
+                <div class="progress-bar {% if b.over %}bg-danger{% else %}bg-success{% endif %}"
+                     style="width: {{ b.percent if b.percent <= 100 else 100 }}%">
+                </div>
+            </div>
+            {% if b.over %}
+            <small class="text-danger">⚠️ 超支 {{ "%.1f"|format(b.percent-100) }}%</small>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="text-center text-muted py-3">
+        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+        <p class="mt-1 small">尚未设置预算，<a href="/budget">去设置</a></p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 最近记录 -->
+<div class="card p-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-clock-history"></i> 最近记录</h6>
+        <a href="/records" class="small text-decoration-none">全部 <i class="bi bi-chevron-right"></i></a>
+    </div>
+    {% if recent_records %}
+        {% for r in recent_records %}
+        <div class="d-flex justify-content-between align-items-center py-2 {% if not loop.last %}border-bottom border-light-subtle{% endif %}">
+            <div class="d-flex align-items-center" style="min-width: 0;">
+                <div class="me-2 text-center" style="width: 36px;">
+                    <div class="small fw-bold text-muted">{{ r.date[8:10] }}</div>
+                    <small class="text-muted" style="font-size: 0.6rem;">{{ r.date[5:7] }}月</small>
+                </div>
+                <div style="min-width: 0;">
+                    <div class="fw-bold small text-truncate">{{ r.category_name }}</div>
+                    <small class="text-muted text-truncate" style="display: block;">{{ r.description or '' }}
+                        {% if r.account_name %}<span class="ms-1">· {{ r.account_icon }}{{ r.account_name }}</span>{% endif %}
+                    </small>
+                </div>
+                {% if r.image_path %}
+                <a href="/record/image/{{ r.id }}" target="_blank" class="ms-2 text-decoration-none" title="查看图片">
+                    <i class="bi bi-image text-muted"></i>
+                </a>
+                {% endif %}
+            </div>
+            <span class="fw-bold small flex-shrink-0 ms-2 stat-summary {% if r.type=='income' %}amount-income{% else %}amount-expense{% endif %}">
+                {{ '+' if r.type=='income' else '-' }}{{ cs }}{{ "%.2f"|format(r.amount) }}
+            </span>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="text-center text-muted py-4">
+        <i class="bi bi-journal-plus" style="font-size: 2.5rem;"></i>
+        <p class="mt-2">还没有记录，<a href="/record/add">记一笔</a></p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

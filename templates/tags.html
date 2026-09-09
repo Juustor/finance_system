@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-tags"></i> 标签管理</h4>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTagModal">
+        <i class="bi bi-plus-lg"></i> 新建标签
+    </button>
+</div>
+
+<div class="row">
+    {% if tags %}
+    {% for tag in tags %}
+    <div class="col-md-4 col-6 mb-3">
+        <div class="card p-3 d-flex flex-row align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <span class="d-inline-block rounded-circle me-2" style="width: 16px; height: 16px; background: {{ tag.color }};"></span>
+                <span class="fw-bold">{{ tag.name }}</span>
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary rounded-pill" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button class="dropdown-item" onclick="editTag({{ tag.id }}, '{{ tag.name }}', '{{ tag.color }}')"><i class="bi bi-pencil"></i> 编辑</button></li>
+                    <li><a class="dropdown-item text-danger" href="/tag/delete/{{ tag.id }}" onclick="return confirm('删除标签「{{ tag.name }}」？')"><i class="bi bi-trash"></i> 删除</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="col-12">
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-tag" style="font-size: 4rem;"></i>
+            <p class="mt-3">还没有标签，点击右上角新建</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 新建标签 -->
+<div class="modal fade" id="addTagModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="/tags">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新建标签</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">标签名称</label>
+                        <input type="text" name="name" class="form-control" placeholder="例：日常、旅行" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">颜色</label>
+                        <input type="color" name="color" class="form-control form-control-color" value="#6366f1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑标签 -->
+<div class="modal fade" id="editTagModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="editTagForm">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> 编辑标签</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">标签名称</label>
+                        <input type="text" name="name" id="editTagName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">颜色</label>
+                        <input type="color" name="color" id="editTagColor" class="form-control form-control-color">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function editTag(id, name, color) {
+    document.getElementById('editTagForm').action = '/tag/edit/' + id;
+    document.getElementById('editTagName').value = name;
+    document.getElementById('editTagColor').value = color;
+    new bootstrap.Modal(document.getElementById('editTagModal')).show();
+}
+</script>
+{% endblock %}

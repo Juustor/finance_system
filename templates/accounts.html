@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-piggy-bank"></i> 账户管理</h4>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAccountModal">
+        <i class="bi bi-plus-lg"></i> 新建账户
+    </button>
+</div>
+
+<!-- 资产负债总览 -->
+<div class="row g-2 g-md-3 mb-3">
+    <div class="col-4">
+        <div class="card p-3 text-center stat-card gradient-income">
+            <small class="text-success fw-bold"><i class="bi bi-bank"></i> 总资产</small>
+            <h5 class="mt-1 mb-0 text-success fw-bold stat-summary">{{ cs }}{{ "%.2f"|format(summary.total_assets) }}</h5>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card p-3 text-center stat-card gradient-expense">
+            <small class="text-danger fw-bold"><i class="bi bi-credit-card-2-front"></i> 总负债</small>
+            <h5 class="mt-1 mb-0 text-danger fw-bold stat-summary">{{ cs }}{{ "%.2f"|format(summary.total_debt) }}</h5>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card p-3 text-center stat-card gradient-info">
+            <small class="text-primary fw-bold"><i class="bi bi-piggy-bank"></i> 净资产</small>
+            <h5 class="mt-1 mb-0 text-primary fw-bold stat-summary">{{ cs }}{{ "%.2f"|format(summary.net_worth) }}</h5>
+        </div>
+    </div>
+</div>
+
+<!-- 账户分类展示 -->
+{% set groups = {'cash': '💵 现金', 'bank': '🏦 银行卡', 'alipay': '📱 支付宝', 'wechat': '💬 微信', 'credit_card': '💳 信用卡', 'virtual': '🔗 虚拟账户'} %}
+
+{% for type_key, type_label in groups.items() %}
+{% set filtered = accounts|selectattr('type', 'equalto', type_key)|list %}
+{% if filtered %}
+<div class="card p-3 mb-3">
+    <h6 class="fw-bold mb-2 text-muted">{{ type_label }}</h6>
+    {% for ac in filtered %}
+    <div class="d-flex justify-content-between align-items-center py-2 {% if not loop.last %}border-bottom border-light{% endif %}">
+        <div class="d-flex align-items-center">
+            <span style="font-size: 1.8rem;">{{ ac.icon }}</span>
+            <div class="ms-2">
+                <div class="fw-bold">{{ ac.name }}</div>
+                <small class="text-muted">{{ ac.type }}</small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold {% if ac.type=='credit_card' %}text-danger{% endif %}">
+                {% if ac.type=='credit_card' %}−{% endif %}{{ cs }}{{ "%.2f"|format(ac.balance|abs) }}
+            </span>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary rounded-pill" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button class="dropdown-item" onclick="editAccount({{ ac.id }}, '{{ ac.name }}', '{{ ac.type }}', '{{ ac.icon }}', '{{ ac.color }}')"><i class="bi bi-pencil"></i> 编辑</button></li>
+                    <li><a class="dropdown-item text-danger" href="/account/archive/{{ ac.id }}" onclick="return confirm('确认归档该账户？')"><i class="bi bi-archive"></i> 归档</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+
+{% if not accounts %}
+<div class="text-center text-muted py-5">
+    <i class="bi bi-wallet2" style="font-size: 4rem;"></i>
+    <p class="mt-3">还没有账户，点击右上角新建</p>
+</div>
+{% endif %}
+
+<!-- 已归档账户 -->
+{% if archived %}
+<div class="card p-3 mt-3">
+    <h6 class="fw-bold mb-2 text-muted"><i class="bi bi-archive"></i> 已归档账户</h6>
+    {% for ac in archived %}
+    <div class="d-flex justify-content-between align-items-center py-2 {% if not loop.last %}border-bottom border-light-subtle{% endif %}">
+        <div class="d-flex align-items-center">
+            <span style="font-size: 1.5rem; opacity: 0.6;">{{ ac.icon }}</span>
+            <div class="ms-2">
+                <div class="fw-bold text-muted">{{ ac.name }}</div>
+                <small class="text-muted">{{ ac.type }}</small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold text-muted stat-summary">{{ cs }}{{ "%.2f"|format(ac.balance) }}</span>
+            <a href="/account/restore/{{ ac.id }}" class="btn btn-sm btn-outline-success rounded-pill" title="恢复账户"><i class="bi bi-arrow-counterclockwise"></i></a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- 新建账户模态框 -->
+<div class="modal fade" id="addAccountModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="/account/add">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新建账户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">账户名称</label>
+                        <input type="text" name="name" class="form-control" placeholder="例：工资卡、零钱" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">类型</label>
+                        <select name="type" class="form-select" required>
+                            <option value="bank">🏦 银行卡</option>
+                            <option value="cash">💵 现金</option>
+                            <option value="alipay">📱 支付宝</option>
+                            <option value="wechat">💬 微信</option>
+                            <option value="credit_card">💳 信用卡</option>
+                            <option value="virtual">🔗 虚拟账户</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">初始余额</label>
+                        <div class="input-group">
+                            <span class="input-group-text">{{ cs }}</span>
+                            <input type="number" step="0.01" name="balance" class="form-control" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">图标</label>
+                        <div class="d-flex gap-2 icon-picker">
+                            {% for icon in ['💳','💰','🏦','💵','📱','💬','🐷','🎯','💼','🏠','🚗','🎓'] %}
+                            <label class="icon-option" style="cursor:pointer;">
+                                <input type="radio" name="icon" value="{{ icon }}" {% if loop.first %}checked{% endif %} class="d-none">
+                                <span class="d-inline-block p-2 rounded border" style="font-size: 1.5rem;">{{ icon }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">颜色</label>
+                        <input type="color" name="color" class="form-control form-control-color" value="#6366f1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 创建账户</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑账户模态框 -->
+<div class="modal fade" id="editAccountModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="editAccountForm">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> 编辑账户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editAccountId">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">账户名称</label>
+                        <input type="text" name="name" id="editAcctName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">类型</label>
+                        <select name="type" id="editAcctType" class="form-select" required>
+                            <option value="bank">🏦 银行卡</option>
+                            <option value="cash">💵 现金</option>
+                            <option value="alipay">📱 支付宝</option>
+                            <option value="wechat">💬 微信</option>
+                            <option value="credit_card">💳 信用卡</option>
+                            <option value="virtual">🔗 虚拟账户</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">图标</label>
+                        <div class="d-flex gap-2 flex-wrap icon-picker" id="editIconPicker">
+                            {% for icon in ['💳','💰','🏦','💵','📱','💬','🐷','🎯','💼','🏠','🚗','🎓'] %}
+                            <label class="icon-option" style="cursor:pointer;">
+                                <input type="radio" name="icon" value="{{ icon }}" class="d-none">
+                                <span class="d-inline-block p-2 rounded border" style="font-size: 1.5rem;">{{ icon }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">颜色</label>
+                        <input type="color" name="color" id="editAcctColor" class="form-control form-control-color" value="#6366f1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function editAccount(id, name, type, icon, color) {
+    document.getElementById('editAccountForm').action = '/account/edit/' + id;
+    document.getElementById('editAcctName').value = name;
+    document.getElementById('editAcctType').value = type;
+    document.getElementById('editAcctColor').value = color;
+    var icons = document.querySelectorAll('#editIconPicker input');
+    icons.forEach(function(inp) {
+        if (inp.value === icon) {
+            inp.checked = true;
+        }
+    });
+    new bootstrap.Modal(document.getElementById('editAccountModal')).show();
+}
+document.querySelectorAll('.icon-picker input').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        document.querySelectorAll('.icon-picker .border-primary').forEach(function(el) {
+            el.classList.remove('border-primary');
+        });
+        this.nextElementSibling.classList.add('border-primary');
+    });
+});
+</script>
+{% endblock %}

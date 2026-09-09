@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+{% block content %}
+{% set cs = settings.currency_symbol if settings else '¥' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-journal-text"></i> 收支账单</h4>
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">共 {{ total }} 条</span>
+        <a href="/record/add" class="btn btn-success btn-sm"><i class="bi bi-plus-lg"></i> 记一笔</a>
+        <button class="btn btn-outline-primary btn-sm" onclick="exportCSV()" title="导出 CSV"><i class="bi bi-download"></i></button>
+    </div>
+</div>
+
+<!-- 筛选结果统计 -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <span class="badge bg-success bg-opacity-10 text-success fs-6 px-3 py-2">筛选收入 {{ cs }}{{ "%.2f"|format(filter_income) }}</span>
+    <span class="badge bg-danger bg-opacity-10 text-danger fs-6 px-3 py-2">筛选支出 {{ cs }}{{ "%.2f"|format(filter_expense) }}</span>
+    <span class="badge {% if filter_income - filter_expense < 0 %}bg-danger{% else %}bg-info{% endif %} bg-opacity-10 text-info fs-6 px-3 py-2">
+        结余 {{ cs }}{{ "%.2f"|format(filter_income - filter_expense) }}
+    </span>
+</div>
+
+<!-- 筛选工具栏 -->
+<div class="card p-3 mb-3 filter-card">
+    <button class="btn btn-sm btn-link text-decoration-none d-md-none p-0 mb-2 text-start" type="button"
+            data-bs-toggle="collapse" data-bs-target="#filterBody" aria-expanded="true">
+        <i class="bi bi-funnel"></i> 筛选条件 <i class="bi bi-chevron-down"></i>
+    </button>
+    <div id="filterBody" class="collapse show">
+        <form id="filterForm" method="get" action="/records" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">🔍 关键词</label>
+                <input type="text" name="keyword" class="form-control form-control-sm" placeholder="金额/备注/分类" value="{{ keyword }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">📂 分类</label>
+                <select name="category_id" class="form-select form-select-sm">
+                    <option value="">全部</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if category_id|string == cat.id|string %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">🏦 账户</label>
+                <select name="account_id" class="form-select form-select-sm">
+                    <option value="">全部</option>
+                    {% for ac in accounts %}
+                    <option value="{{ ac.id }}" {% if account_id|string == ac.id|string %}selected{% endif %}>{{ ac.icon }} {{ ac.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">🏷️ 标签</label>
+                <select name="tag_id" class="form-select form-select-sm">
+                    <option value="">全部</option>
+                    {% for tag in tags %}
+                    <option value="{{ tag.id }}" {% if tag_id|string == tag.id|string %}selected{% endif %}>{{ tag.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">📅 日期范围</label>
+                <div class="d-flex gap-1">
+                    <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+                    <span class="align-self-center text-muted small">~</span>
+                    <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">💰 金额范围</label>
+                <div class="d-flex gap-1">
+                    <input type="number" step="0.01" name="amount_min" class="form-control form-control-sm" placeholder="最低" value="{{ amount_min }}">
+                    <span class="align-self-center text-muted small">~</span>
+                    <input type="number" step="0.01" name="amount_max" class="form-control form-control-sm" placeholder="最高" value="{{ amount_max }}">
+                </div>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">📌 类型</label>
+                <select name="type" class="form-select form-select-sm">
+                    <option value="">全部</option>
+                    <option value="income" {% if type_ == 'income' %}selected{% endif %}>收入</option>
+                    <option value="expense" {% if type_ == 'expense' %}selected{% endif %}>支出</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small fw-bold">✅ 状态</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">全部</option>
+                    <option value="uncleared" {% if status == 'uncleared' %}selected{% endif %}>未对账</option>
+                    <option value="cleared" {% if status == 'cleared' %}selected{% endif %}>已对账</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">↕️ 排序</label>
+                <select name="order_by" class="form-select form-select-sm">
+                    <option value="date_desc" {% if order_by == 'date_desc' %}selected{% endif %}>日期 ↓</option>
+                    <option value="date_asc" {% if order_by == 'date_asc' %}selected{% endif %}>日期 ↑</option>
+                    <option value="amount_desc" {% if order_by == 'amount_desc' %}selected{% endif %}>金额 ↓</option>
+                    <option value="amount_asc" {% if order_by == 'amount_asc' %}selected{% endif %}>金额 ↑</option>
+                </select>
+            </div>
+            <div class="col-md-12 d-flex gap-2 align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> 搜索</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetFilter()"><i class="bi bi-x-lg"></i> 重置</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="exportCSV()"><i class="bi bi-download"></i> 导出</button>
+            </div>
+            <input type="hidden" name="page" value="1">
+        </form>
+    </div>
+</div>
+
+<form id="batchForm" method="post">
+{% if records %}
+<!-- 批量操作栏 -->
+<div id="batchBar" class="d-none align-items-center gap-2 p-2 mb-2 batch-bar rounded border" style="display:none !important;">
+    <span class="small fw-bold text-muted me-1"><span id="selectedCount">0</span> 条已选</span>
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="batchDelete()"><i class="bi bi-trash"></i> 批量删除</button>
+    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openBatchEditModal()"><i class="bi bi-pencil"></i> 批量修改</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSelection()"><i class="bi bi-x-lg"></i> 取消选择</button>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th style="width:40px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                <th>日期</th>
+                <th>类型</th>
+                <th>分类</th>
+                <th>账户</th>
+                <th>金额</th>
+                <th>备注</th>
+                <th>标签</th>
+                <th>状态</th>
+                <th style="width:70px">图片</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td><input type="checkbox" name="record_ids[]" value="{{ r.id }}" class="row-checkbox" onchange="updateBatchBar()"></td>
+                <td class="small">{{ r.date }}</td>
+                <td>
+                    <span class="badge bg-{{ 'success' if r.type=='income' else 'danger' }} bg-opacity-10 text-{{ 'success' if r.type=='income' else 'danger' }} px-2 py-1">
+                        {{ '💰 收入' if r.type=='income' else '💸 支出' }}
+                    </span>
+                </td>
+                <td class="fw-bold small">{{ r.category_name }}</td>
+                <td><small>{% if r.account_icon %}{{ r.account_icon }}{% endif %}{{ r.account_name or '--' }}</small></td>
+                <td class="fw-bold {{ 'text-success' if r.type=='income' else 'text-danger' }} stat-summary">
+                    {{ '+' if r.type=='income' else '-' }}{{ cs }}{{ "%.2f"|format(r.amount) }}
+                </td>
+                <td><small class="text-muted truncate-1" style="max-width: 140px;">{{ r.description or '--' }}</small></td>
+                <td>
+                    {% if r.tags %}
+                    <div class="d-flex gap-1 flex-wrap">
+                        {% for t in r.tags %}
+                        <span class="badge" style="background: {{ t.color }};">{{ t.name }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <small class="text-muted">--</small>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if r.status == 'cleared' %}
+                    <span class="badge bg-success bg-opacity-10 text-success">已对账</span>
+                    {% else %}
+                    <span class="badge bg-warning bg-opacity-10 text-warning">未对账</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if r.image_path %}
+                    <a href="/record/image/{{ r.id }}" target="_blank"><i class="bi bi-image text-primary fs-5"></i></a>
+                    {% else %}
+                    <small class="text-muted">--</small>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button type="button" class="dropdown-item" data-desc="{{ r.description }}" onclick="openEditModal({{ r.id }}, '{{ r.type }}', {{ r.category_id }}, {{ r.amount }}, '{{ r.date }}', this.dataset.desc || '', '{{ r.account_id or '' }}', '{{ r.status }}', [{% for t in r.tags %}{{ t.id }}{% if not loop.last %},{% endif %}{% endfor %}])"><i class="bi bi-pencil"></i> 编辑</button></li>
+                            <li><a class="dropdown-item text-danger" href="/record/delete/{{ r.id }}" onclick="return confirm('确认删除？')"><i class="bi bi-trash"></i> 删除</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 分页 -->
+{% if total_pages > 1 %}
+<nav>
+    <ul class="pagination pagination-sm justify-content-center">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link" href="#" onclick="return pageLink({{ page-1 }})"><i class="bi bi-chevron-left"></i></a>
+        </li>
+        {% for p in range(1, total_pages + 1) %}
+        {% if p == page or p == 1 or p == total_pages or (p >= page-2 and p <= page+2) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="#" onclick="return pageLink({{ p }})">{{ p }}</a>
+        </li>
+        {% elif p == page-3 or p == page+3 %}
+        <li class="page-item disabled"><a class="page-link">...</a></li>
+        {% endif %}
+        {% endfor %}
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+            <a class="page-link" href="#" onclick="return pageLink({{ page+1 }})"><i class="bi bi-chevron-right"></i></a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-journal-plus" style="font-size: 4rem; color: #cbd5e1;"></i>
+    <h5 class="text-muted mt-3">没有找到记录</h5>
+    <p class="text-muted">换个筛选条件试试，或去<a href="/record/add">记一笔</a></p>
+</div>
+{% endif %}
+</form>
+
+<!-- 编辑模态框 -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="post" id="editForm" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> 编辑记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editRecordId">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">类型</label>
+                        <div class="d-flex gap-2">
+                            <input type="radio" class="btn-check" name="type" id="editTypeExpense" value="expense">
+                            <label class="btn btn-outline-danger flex-fill" for="editTypeExpense">💸 支出</label>
+                            <input type="radio" class="btn-check" name="type" id="editTypeIncome" value="income">
+                            <label class="btn btn-outline-success flex-fill" for="editTypeIncome">💰 收入</label>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">分类</label>
+                            <select name="category_id" id="editCategorySelect" class="form-select" required>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">账户</label>
+                            <select name="account_id" id="editAccountSelect" class="form-select">
+                                <option value="">无</option>
+                                {% for ac in accounts %}
+                                <option value="{{ ac.id }}">{{ ac.icon }} {{ ac.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">金额</label>
+                        <div class="input-group">
+                            <span class="input-group-text">{{ cs }}</span>
+                            <input type="number" step="0.01" name="amount" id="editAmount" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">日期</label>
+                            <input type="date" name="date" id="editDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">对账状态</label>
+                            <select name="status" class="form-select">
+                                <option value="uncleared">未对账</option>
+                                <option value="cleared">已对账</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><i class="bi bi-tags"></i> 标签</label>
+                        <div class="d-flex flex-wrap gap-2" style="max-height: 110px; overflow-y: auto;">
+                            {% for tag in tags %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input edit-tag-cb" type="checkbox" name="tags" value="{{ tag.id }}" id="editTag{{ tag.id }}">
+                                <label class="form-check-label small" for="editTag{{ tag.id }}">
+                                    <span class="d-inline-block rounded-circle me-1" style="width: 8px; height: 8px; background: {{ tag.color }};"></span>
+                                    {{ tag.name }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">备注</label>
+                        <input type="text" name="description" id="editDesc" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><i class="bi bi-camera"></i> 更换图片</label>
+                        <input type="file" name="image" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 批量修改模态框 -->
+<div class="modal fade" id="batchEditModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="/records/batch-edit">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> 批量修改</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="batchEditIdsContainer"></div>
+                    <p class="text-muted small">将修改 <span id="batchEditCount">0</span> 条记录</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">分类 <small class="text-muted">(留空不改)</small></label>
+                        <select name="batch_category_id" class="form-select">
+                            <option value="">不修改</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" data-type="{{ cat.type }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">账户 <small class="text-muted">(留空不改)</small></label>
+                        <select name="batch_account_id" class="form-select">
+                            <option value="">不修改</option>
+                            <option value="0">移除账户</option>
+                            {% for ac in accounts %}
+                            <option value="{{ ac.id }}">{{ ac.icon }} {{ ac.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">对账状态 <small class="text-muted">(留空不改)</small></label>
+                        <select name="batch_status" class="form-select">
+                            <option value="">不修改</option>
+                            <option value="cleared">已对账</option>
+                            <option value="uncleared">未对账</option>
+                        </select>
+                    </div>
+                    <input id="batchRecordIds" type="hidden" name="record_ids[]" value="">
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> 确认修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function pageLink(p) {
+    const form = document.getElementById('filterForm');
+    form.page.value = p;
+    form.submit();
+    return false;
+}
+
+function exportCSV() {
+    const form = document.getElementById('filterForm');
+    const params = new URLSearchParams(new FormData(form)).toString();
+    window.location.href = '/records/export?' + params;
+}
+
+function resetFilter() {
+    window.location.href = '/records';
+}
+
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = checked);
+    updateBatchBar();
+}
+
+function updateBatchBar() {
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    const count = checkboxes.length;
+    const bar = document.getElementById('batchBar');
+    if (count > 0) {
+        bar.classList.remove('d-none');
+        bar.style.display = 'flex';
+    } else {
+        bar.classList.add('d-none');
+        bar.style.display = 'none';
+    }
+    document.getElementById('selectedCount').textContent = count;
+}
+
+function clearSelection() {
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBatchBar();
+}
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+}
+
+function batchDelete() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    if (!confirm(`确认删除 ${ids.length} 条记录？`)) return;
+    const form = document.getElementById('batchForm');
+    form.action = '/records/batch-delete';
+    form.querySelectorAll('input[name="record_ids[]"]').forEach(el => el.remove());
+    ids.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'record_ids[]';
+        input.value = id;
+        form.appendChild(input);
+    });
+    form.submit();
+}
+
+function openBatchEditModal() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    document.getElementById('batchEditCount').textContent = ids.length;
+    document.getElementById('batchRecordIds').value = ids.join(',');
+    new bootstrap.Modal(document.getElementById('batchEditModal')).show();
+}
+
+document.querySelector('#batchEditModal form').addEventListener('submit', function(e) {
+    const idsStr = document.getElementById('batchRecordIds').value;
+    const ids = idsStr.split(',').filter(Boolean);
+    document.getElementById('batchRecordIds').remove();
+    ids.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'record_ids[]';
+        input.value = id;
+        this.appendChild(input);
+    });
+    const catVal = this.querySelector('[name="batch_category_id"]').value;
+    const accVal = this.querySelector('[name="batch_account_id"]').value;
+    const statusVal = this.querySelector('[name="batch_status"]').value;
+    if (catVal) {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'category_id'; input.value = catVal;
+        this.appendChild(input);
+    }
+    if (accVal !== '') {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'account_id'; input.value = accVal;
+        this.appendChild(input);
+    }
+    if (statusVal) {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'status'; input.value = statusVal;
+        this.appendChild(input);
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('editTypeExpense').addEventListener('change', filterEditCategories);
+    document.getElementById('editTypeIncome').addEventListener('change', filterEditCategories);
+});
+
+function openEditModal(id, type, categoryId, amount, date, desc, accountId, status, tagIds) {
+    document.getElementById('editForm').action = '/record/edit/' + id;
+    document.getElementById('editRecordId').value = id;
+    document.getElementById('editTypeExpense').checked = (type === 'expense');
+    document.getElementById('editTypeIncome').checked = (type === 'income');
+
+    const catSelect = document.getElementById('editCategorySelect');
+    catSelect.value = categoryId;
+    document.getElementById('editAmount').value = amount;
+    document.getElementById('editDate').value = date;
+    document.getElementById('editDesc').value = desc;
+    document.getElementById('editAccountSelect').value = accountId || '';
+    const statusSelect = document.querySelector('#editForm [name="status"]');
+    if (statusSelect) statusSelect.value = status || 'uncleared';
+
+    document.querySelectorAll('.edit-tag-cb').forEach(cb => cb.checked = false);
+    (tagIds || []).forEach(tid => {
+        const cb = document.getElementById('editTag' + tid);
+        if (cb) cb.checked = true;
+    });
+
+    filterEditCategories();
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+function filterEditCategories() {
+    const typeRadio = document.querySelector('#editForm input[name="type"]:checked');
+    if (!typeRadio) return;
+    const type = typeRadio.value;
+    const catSelect = document.getElementById('editCategorySelect');
+    let firstVisible = null;
+    for (let opt of catSelect.options) {
+        if (opt.getAttribute('data-type') === type) {
+            opt.style.display = 'block';
+            if (!firstVisible) firstVisible = opt;
+        } else {
+            opt.style.display = 'none';
+        }
+    }
+    if (firstVisible && !catSelect.value) firstVisible.selected = true;
+}
+</script>
+{% endblock %}
